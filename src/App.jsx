@@ -230,6 +230,21 @@ function App() {
                     const oldIn = oldTxs.find(t => t.type === 'entrata');
                     if (oldOut) outId = oldOut.id;
                     if (oldIn) inId = oldIn.id;
+                    console.log('DEBUG - Modifica trasferimento:', {
+                        editingId,
+                        transferId,
+                        outId,
+                        inId,
+                        oldTxs,
+                        oldOut,
+                        oldIn
+                    });
+                } else {
+                    console.log('DEBUG - Nuovo trasferimento:', {
+                        transferId,
+                        outId,
+                        inId
+                    });
                 }
                 // Sincronizza categoria, data e orario tra entrata e uscita
                 const sharedFields = {
@@ -259,6 +274,8 @@ function App() {
                     account: form.destinationAccount,
                     transferId,
                 };
+                console.log('DEBUG - Salvo transferOut:', transferOut);
+                console.log('DEBUG - Salvo transferIn:', transferIn);
                 setTransactions(prev => [
                     ...prev.filter(t => t.transferId !== transferId),
                     transferOut,
@@ -266,6 +283,10 @@ function App() {
                 ]);
                 await saveTransaction(user.uid, transferOut);
                 await saveTransaction(user.uid, transferIn);
+                // Refresh forzato delle transazioni dopo il salvataggio
+                const txs = await getTransactions(user.uid);
+                console.log('DEBUG - Lista transazioni dopo salvataggio:', txs);
+                setTransactions(txs);
             } else {
                 const updated = {
                     ...form,
@@ -848,9 +869,7 @@ function App() {
                 <div className="summaryRow balanceRow">
                     <span>Bilancio:</span>
                     <span className={filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
-                        filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) >= 0
-                        ? 'income amount'
-                        : 'expense amount'}>
+                        filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) >= 0 ? 'income amount' : 'expense amount'}>
                         {filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
                             filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) >= 0 ? '+' : '-'}
                         {Math.abs(filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
