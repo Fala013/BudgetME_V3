@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://Fala013.github.io/BudgetME_V2",
+  "homepage": "https://Fala013.github.io/BudgetME_V3",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -20,6 +20,8 @@
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.0.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.37.5",
     "gh-pages": "^6.3.0",
     "vite": "^4.4.5"
   }

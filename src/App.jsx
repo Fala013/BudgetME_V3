@@ -215,37 +215,93 @@ function App() {
     };
 
     const handleAddOrEdit = async () => {
+        console.log('DEBUG - handleAddOrEdit chiamata', form);
         setIsLoading(true);
         try {
             const normalizedAmount = form.amount.replace(',', '.');
+            // Ricavo il transferId anche se la transazione è vecchia e non ha il campo transferId
             let transferId = editingId && transactions.find(t => t.id === editingId)?.transferId;
+            if (!transferId && editingId && editingId.toString().endsWith('_in')) {
+                transferId = editingId.toString().replace('_in', '');
+            } else if (!transferId && editingId && editingId.toString().endsWith('_out')) {
+                transferId = editingId.toString().replace('_out', '');
+            }
+            console.log('DEBUG - transferId calcolato:', transferId);
             if (form.type === 'trasferimento') {
                 if (!transferId) transferId = Date.now();
+                // Se stai modificando un trasferimento esistente, mantieni gli id originali
+                let oldTxs = transactions.filter(t => t.transferId === transferId);
+                // Se non trova nulla, cerca tramite id base (per vecchi trasferimenti)
+                if (oldTxs.length === 0) {
+                    const baseId = transferId.toString();
+                    oldTxs = transactions.filter(t => t.id === baseId + '_in' || t.id === baseId + '_out');
+                }
+                let outId = transferId + '_out';
+                let inId = transferId + '_in';
+                // Se trova 2 transazioni, aggiorna entrambe indipendentemente dal type
+                if (oldTxs.length === 2) {
+                    outId = oldTxs[0].id.endsWith('_out') ? oldTxs[0].id : oldTxs[1].id;
+                    inId = oldTxs[0].id.endsWith('_in') ? oldTxs[0].id : oldTxs[1].id;
+                } else {
+                    if (editingId && editingId.toString().endsWith('_out')) outId = editingId;
+                    if (editingId && editingId.toString().endsWith('_in')) inId = editingId;
+                }
+                const oldOut = oldTxs.find(t => t.id === outId);
+                const oldIn = oldTxs.find(t => t.id === inId);
+                console.log('DEBUG - Modifica trasferimento:', {
+                    editingId,
+                    transferId,
+                    outId,
+                    inId,
+                    oldTxs,
+                    oldOut,
+                    oldIn
+                });
+                // Sincronizza categoria, data e orario tra entrata e uscita
+                const sharedFields = {
+                    category: form.category,
+                    date: form.date,
+                    time: form.time,
+                    repeat: form.repeat,
+                    endDate: form.endDate,
+                };
                 const transferOut = {
                     ...form,
-                    id: transferId + '_out',
+                    ...sharedFields,
+                    id: outId,
                     amount: normalizedAmount,
                     type: 'uscita',
                     description: `Trasferimento a ${form.destinationAccount}`,
                     account: form.account,
-                    transferId
+                    transferId,
                 };
                 const transferIn = {
                     ...form,
-                    id: transferId + '_in',
+                    ...sharedFields,
+                    id: inId,
                     amount: normalizedAmount,
                     type: 'entrata',
                     description: `Trasferimento da ${form.account}`,
                     account: form.destinationAccount,
-                    transferId
+                    transferId,
                 };
+                console.log('DEBUG - Salvo transferOut:', transferOut);
+                console.log('DEBUG - Salvo transferIn:', transferIn);
                 setTransactions(prev => [
-                    ...prev.filter(t => t.transferId !== transferId),
+                    ...prev.filter(t =>
+                        !(t.transferId === transferId ||
+                          t.id === transferId + '_in' ||
+                          t.id === transferId + '_out')
+                    ),
                     transferOut,
                     transferIn
                 ]);
                 await saveTransaction(user.uid, transferOut);
                 await saveTransaction(user.uid, transferIn);
+                // Refresh forzato delle transazioni dopo il salvataggio
+                const txs = await getTransactions(user.uid);
+                console.log('DEBUG - Lista transazioni dopo salvataggio:', txs);
+                setTransactions(txs);
             } else {
                 const updated = {
                     ...form,
@@ -270,11 +326,19 @@ function App() {
     const handleEdit = (id) => {
         const tx = transactions.find(t => t.id === id);
         if (tx) {
-            if (tx.transferId) {
-                // È un trasferimento: recupera entrambe le transazioni
-                const allTx = transactions.filter(t => t.transferId === tx.transferId);
-                const outTx = allTx.find(t => t.type === 'uscita');
-                const inTx = allTx.find(t => t.type === 'entrata');
+            // Forza sempre type: 'trasferimento' se id termina con _in/_out o descrizione inizia con 'Trasferimento'
+            const isTransfer = tx.transferId || id.toString().endsWith('_in') || id.toString().endsWith('_out') || (tx.description && tx.description.toLowerCase().startsWith('trasferimento'));
+            if (isTransfer) {
+                // Cerca comunque le due transazioni collegate
+                let transferId = tx.transferId;
+                if (!transferId && id.toString().endsWith('_in')) transferId = id.toString().replace('_in', '');
+                if (!transferId && id.toString().endsWith('_out')) transferId = id.toString().replace('_out', '');
+                let allTx = transactions.filter(t => t.transferId === transferId);
+                if (allTx.length === 0) {
+                    allTx = transactions.filter(t => t.id === transferId + '_in' || t.id === transferId + '_out');
+                }
+                const outTx = allTx.find(t => t.id.endsWith('_out'));
+                const inTx = allTx.find(t => t.id.endsWith('_in'));
                 setForm({
                     description: outTx ? outTx.description : tx.description,
                     amount: outTx ? outTx.amount : tx.amount,
@@ -282,15 +346,15 @@ function App() {
                     type: 'trasferimento',
                     date: outTx ? outTx.date : tx.date,
                     time: outTx ? outTx.time : tx.time,
-                    repeat: 'nessuna',
+                    repeat: outTx ? outTx.repeat : 'nessuna',
                     account: outTx ? outTx.account : tx.account,
-                    endDate: '',
+                    endDate: outTx ? outTx.endDate : '',
                     destinationAccount: inTx ? inTx.account : '',
                 });
                 setEditingId(outTx ? outTx.id : tx.id);
             } else {
-            setForm(tx);
-            setEditingId(id);
+                setForm(tx);
+                setEditingId(id);
             }
             setShowModal(true);
         }
@@ -826,16 +890,20 @@ function App() {
                 </div>
                 <div className="summaryRow balanceRow">
                     <span>Bilancio:</span>
-                    <span className={filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
+                    <span className={
+                        filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
                         filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) >= 0
-                        ? 'income amount'
-                        : 'expense amount'}>
-                        {filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
-                            filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) >= 0 ? '+' : '-'}
-                        {Math.abs(filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
-                            filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0))
-                            .toFixed(2)
-                            .replace('.', ',')} €
+                            ? 'income amount'
+                            : 'expense amount'
+                    }>
+                        {
+                            (filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
+                            filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) >= 0 ? '+' : '-') +
+                            Math.abs(
+                                filteredTx.filter(t => t.type === 'entrata').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0) -
+                                filteredTx.filter(t => t.type === 'uscita').reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0)
+                            ).toFixed(2).replace('.', ',')
+                        } €
                     </span>
                 </div>
             </div>

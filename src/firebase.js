@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, addDoc, getDocs, setDoc, doc, updateDoc, deleteDoc, query, where, getDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, deleteDoc, doc, getDocs, getFirestore, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDt3kepZQrZHlRxUj2EKNR-Te5cRpX_1JY",
@@ -18,29 +18,17 @@ const db = getFirestore(app);
 
 // Funzioni di autenticazione
 export const loginUser = async (email, password) => {
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return userCredential.user;
-  } catch (error) {
-    throw error;
-  }
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  return userCredential.user;
 };
 
 export const registerUser = async (email, password) => {
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    return userCredential.user;
-  } catch (error) {
-    throw error;
-  }
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  return userCredential.user;
 };
 
 export const logoutUser = async () => {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    throw error;
-  }
+  await signOut(auth);
 };
 
 // Funzioni Firestore
@@ -82,16 +70,9 @@ export const saveCategories = async (userId, categories) => {
 };
 
 export const getCategories = async (userId) => {
-  const ref = doc(db, `users/${userId}/settings/categories`);
-  const docSnap = await getDoc(ref);
-  if (docSnap.exists()) {
-    return docSnap.data().categories;
-  }
-  return [
-    'Affitto', 'Animali', 'Assicurazioni', 'Auto', 'Bollette', 'Carburante',
-    'Intrattenimento', 'Finanziamento', 'Prelievo', 'Ristorante', 'Shopping',
-    'Spesa', 'Stipendio', 'Telefono', 'Tempo Libero', 'Altro'
-  ];
+  const snapshot = await getDocs(collection(db, `users/${userId}/settings`));
+  const docSnap = snapshot.docs.find(doc => doc.id === 'categories');
+  return docSnap ? docSnap.data().categories : [];
 };
 
 export { auth, db }; 
