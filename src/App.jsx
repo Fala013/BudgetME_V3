@@ -221,23 +221,43 @@ function App() {
             let transferId = editingId && transactions.find(t => t.id === editingId)?.transferId;
             if (form.type === 'trasferimento') {
                 if (!transferId) transferId = Date.now();
+                // Se stai modificando un trasferimento esistente, mantieni gli id originali
+                let outId = transferId + '_out';
+                let inId = transferId + '_in';
+                if (editingId) {
+                    const oldTxs = transactions.filter(t => t.transferId === transferId);
+                    const oldOut = oldTxs.find(t => t.type === 'uscita');
+                    const oldIn = oldTxs.find(t => t.type === 'entrata');
+                    if (oldOut) outId = oldOut.id;
+                    if (oldIn) inId = oldIn.id;
+                }
+                // Sincronizza categoria, data e orario tra entrata e uscita
+                const sharedFields = {
+                    category: form.category,
+                    date: form.date,
+                    time: form.time,
+                    repeat: form.repeat,
+                    endDate: form.endDate,
+                };
                 const transferOut = {
                     ...form,
-                    id: transferId + '_out',
+                    ...sharedFields,
+                    id: outId,
                     amount: normalizedAmount,
                     type: 'uscita',
                     description: `Trasferimento a ${form.destinationAccount}`,
                     account: form.account,
-                    transferId
+                    transferId,
                 };
                 const transferIn = {
                     ...form,
-                    id: transferId + '_in',
+                    ...sharedFields,
+                    id: inId,
                     amount: normalizedAmount,
                     type: 'entrata',
                     description: `Trasferimento da ${form.account}`,
                     account: form.destinationAccount,
-                    transferId
+                    transferId,
                 };
                 setTransactions(prev => [
                     ...prev.filter(t => t.transferId !== transferId),
@@ -275,6 +295,7 @@ function App() {
                 const allTx = transactions.filter(t => t.transferId === tx.transferId);
                 const outTx = allTx.find(t => t.type === 'uscita');
                 const inTx = allTx.find(t => t.type === 'entrata');
+                // Carica SEMPRE i dati condivisi dalla transazione 'uscita'
                 setForm({
                     description: outTx ? outTx.description : tx.description,
                     amount: outTx ? outTx.amount : tx.amount,
@@ -282,15 +303,15 @@ function App() {
                     type: 'trasferimento',
                     date: outTx ? outTx.date : tx.date,
                     time: outTx ? outTx.time : tx.time,
-                    repeat: 'nessuna',
+                    repeat: outTx ? outTx.repeat : 'nessuna',
                     account: outTx ? outTx.account : tx.account,
-                    endDate: '',
+                    endDate: outTx ? outTx.endDate : '',
                     destinationAccount: inTx ? inTx.account : '',
                 });
                 setEditingId(outTx ? outTx.id : tx.id);
             } else {
-            setForm(tx);
-            setEditingId(id);
+                setForm(tx);
+                setEditingId(id);
             }
             setShowModal(true);
         }
