@@ -1,0 +1,26 @@
+{
+  "name": "budgetme",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "homepage": "https://Fala013.github.io/BudgetME_V2",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  },
+  "dependencies": {
+    "firebase": "^11.8.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "gh-pages": "^6.3.0",
+    "vite": "^4.4.5"
+  }
+}
